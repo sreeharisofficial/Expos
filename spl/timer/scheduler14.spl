@@ -1,0 +1,50 @@
+alias PID R0;
+PID=[SYSTEM_STATUS_TABLE+1];
+
+multipush(BP);
+
+alias processTable R1;
+processTable=PROCESS_TABLE+(PID*16);
+[processTable+12]=SP % 512;
+[processTable+14]=PTBR;
+[processTable+15]=PTLR;
+
+alias inc R2;
+inc=PID + 1;
+while(inc < 16) do
+	if([PROCESS_TABLE + inc*16 + 4] == CREATED || [PROCESS_TABLE + inc*16 + 4] == READY) then
+		break;
+	endif;
+	inc=inc+1;
+endwhile;
+
+alias newPID R3;
+if(inc==16) then
+	newPID=0;
+else
+	newPID=inc;
+endif;
+
+alias userAreaPageNum R4;
+alias kernelStackPtr R5;
+userAreaPageNum=[PROCESS_TABLE + newPID*16 + 11];
+kernelStackPtr=[PROCESS_TABLE + newPID*16 + 12];
+SP = userAreaPageNum*512 + kernelStackPtr;
+PTBR = [PROCESS_TABLE + newPID*16 + 14];
+PTLR = [PROCESS_TABLE + newPID*16 + 15];
+
+[SYSTEM_STATUS_TABLE + 1]=newPID;
+
+if([PROCESS_TABLE + newPID*16 + 4]==CREATED) then
+	SP=[PROCESS_TABLE + newPID*16 + 13];
+	[PROCESS_TABLE + newPID*16 + 4]=RUNNING;
+	[PROCESS_TABLE + newPID*16 + 9]=0;
+	ireturn;
+endif;
+
+[PROCESS_TABLE + newPID*16 + 4]=RUNNING;
+[PROCESS_TABLE + newPID*16 + 9]=0;
+
+multipop (BP);
+
+return;

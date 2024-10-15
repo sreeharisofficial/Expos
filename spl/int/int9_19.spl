@@ -1,0 +1,149 @@
+breakpoint;
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=9;
+alias usersp R0;
+usersp=SP;
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13]=usersp;
+SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+alias physicalpagenum R1;
+alias offset R2;
+alias filenameaddr R3;
+physicalpagenum=[PTBR+2*((usersp-4)/512)];
+offset=(usersp-4)%512;
+filenameaddr=physicalpagenum*512+offset;
+alias fileName R4;
+fileName=[filenameaddr];
+
+alias counter R5;
+counter=0;
+alias inodeEntry R6;
+inodeEntry=-1;
+while(counter<60) do
+	if(([INODE_TABLE+counter*16+1]==fileName)&&([INODE_TABLE+counter*16]==EXEC)) then
+		inodeEntry=counter;
+		break;
+	endif;
+	counter=counter+1;
+endwhile;
+if(inodeEntry==-1) then
+	alias physicalAddrRetVal R7;
+	physicalAddrRetVal=([PTBR+2*((usersp-1)/512)]*512)+((usersp-1)%512);
+	[physicalAddrRetVal]=-1;
+	SP=usersp;
+	[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0;
+	ireturn;
+else
+	alias PID R7;
+	
+	PID=[SYSTEM_STATUS_TABLE+1];
+	multipush(R0,R6,R7);
+	R1=3;
+	R2=PID;
+	
+	call PROCESS_MANAGER;
+	
+	multipop(R0,R6,R7);
+	[MEMORY_FREE_LIST+[PROCESS_TABLE+PID*16+11]]=[MEMORY_FREE_LIST+[PROCESS_TABLE+PID*16+11]]+1;
+	[SYSTEM_STATUS_TABLE+2]=[SYSTEM_STATUS_TABLE+2]-1;	
+	SP=[PROCESS_TABLE+PID*16+11]*512-1;
+	
+	alias processTableEntry R8;
+	processTableEntry=PROCESS_TABLE+PID*16;
+	
+	
+	counter=1;
+	while(counter<=8) do
+		[([processTableEntry+11]+1)*512-2*counter]=-1;
+		counter=counter+1;
+	endwhile;
+	
+	[processTableEntry+4]=RUNNING;
+	[processTableEntry+7]=inodeEntry;
+	PTBR=[processTableEntry+14];
+	[PTBR+0]=63;
+	[PTBR+1]="0100";
+	[PTBR+2]=64;
+	[PTBR+3]="0100";
+	multipush(R0,R6,R7,R8);
+	
+	//R1=1;
+	//call MEMORY_MANAGER;
+	//[PTBR+4]=R0;
+	//[PTBR+5]="0110";
+	//R1=1;
+	//call MEMORY_MANAGER;
+	//[PTBR+6]=R0;
+	//[PTBR+7]="0110";
+	
+	[PTBR+5]="0000";
+	[PTBR+7]="0000";
+	
+	R1=1;
+	call MEMORY_MANAGER;
+	[PTBR+16]=R0;
+	[PTBR+17]="0110";
+	R1=1;
+	call MEMORY_MANAGER;
+	[PTBR+18]=R0;
+	[PTBR+19]="0110";
+	multipop(R0,R6,R7,R8);
+	
+	alias blockno R9;
+	blockno=(([INODE_TABLE+(16*[processTableEntry+7])+2])/512)+1;
+	
+	multipush(R0,R5,R6,R7,R8,R9);
+	
+	R1=5;
+	R2=[INODE_TABLE+(16*[processTableEntry+7])+8];
+	breakpoint;
+	call MEMORY_MANAGER;
+	[PTBR+8]=R0;
+	[PTBR+8+1]="0100";
+	multipop(R0,R5,R6,R7,R8,R9);
+	[PTBR+10]=-1;
+	[PTBR+11]="0000";
+	[PTBR+12]=-1;
+	[PTBR+13]="0000";
+	[PTBR+14]=-1;
+	[PTBR+15]="0000";
+	
+	counter=0;
+	while(counter<10) do
+		[DISK_MAP_TABLE+10*PID+counter]=-1;
+		counter=counter+1;
+	endwhile;
+	
+	counter=0;
+	while(counter<4) do
+		[DISK_MAP_TABLE+10*PID+4+counter]=[INODE_TABLE+(16*[processTableEntry+7])+counter+8];
+		counter=counter+1;
+	endwhile;
+	
+	//counter=0;
+	//while(counter<blockno) do
+	//	multipush(R0,R5,R6,R7,R8,R9);
+	//	R1=1;
+	//	call MEMORY_MANAGER;
+	//	alias codePage R10;
+	//	codePage=R0;
+	//	multipop(R0,R5,R6,R7,R8,R9);
+	//	[PTBR+8+2*counter]=codePage;
+	//	[PTBR+8+2*counter+1]="0100";
+	//	multipush(R0,R5,R6,R7,R8,R9);
+	//	R1=2;
+	//	R2=PID;
+	//	R3=codePage;
+	//	R4=[INODE_TABLE+(16*[processTableEntry+7])+counter+8];
+	//	call DEVICE_MANAGER;
+	//	multipop(R0,R5,R6,R7,R8,R9);
+	//	counter=counter+1;
+		
+	//endwhile;
+	
+	[[PTBR+16]*512]=[[PTBR+8]*512+1];
+	SP=8*512;
+	
+	[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0;
+	breakpoint;
+	ireturn;
+endif;

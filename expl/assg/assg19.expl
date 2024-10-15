@@ -1,0 +1,46 @@
+type
+node{
+	int key;
+	node next;
+}
+linklist{
+	node head;
+}
+endtype
+int main(){
+decl
+	linklist ll;
+	node nn,prev;
+	int i,num,t,N;
+enddecl
+begin
+	t=initialize();
+	ll=alloc();
+	prev=alloc();
+	t=exposcall("Read",-1,N);
+	i=0;
+	while(i<N) do
+		t=exposcall("Read",-1,num);
+		nn=alloc();
+		nn.key=num;
+		if(i==0) then
+			ll.head=nn;
+			
+		else
+			prev.next=nn;
+			
+		endif;
+		prev=nn;
+		i=i+1;	
+	endwhile;
+	t=exposcall("Write",-2," ");
+	nn=ll.head;
+	i=0;
+	while(i<N) do
+		t=exposcall("Write",-2,nn.key);
+		nn=nn.next;
+		i=i+1;
+	endwhile;
+	return 0;
+end
+}
